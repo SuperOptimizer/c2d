@@ -53,3 +53,14 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Build artifacts
+build/
+cmake-build-*/
+
+# Bench output (canonical results in bench-results.tsv only)
+bench-*.tsv
+!bench-results.tsv
+*.log
+.claude/
+*.err

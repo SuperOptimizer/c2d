@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        build-type: [Release, Debug]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OpenMP (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libomp-dev
+
+      - name: Install OpenMP (macOS)
+        if: runner.os == 'macOS'
+        run: brew install libomp
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Run round-trip tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: CLI smoke test
+        run: |
+          ./build/c2d version
+          ./build/c2d encode testdata/kodak/kodim03.png /tmp/k3.c2d --ratio 20
+          ./build/c2d info /tmp/k3.c2d
+          ./build/c2d decode /tmp/k3.c2d /tmp/k3.png
+          test -s /tmp/k3.png
+
+      - name: Encode/decode round-trip every dtype/channel combo
+        run: ./build/c2d_test
+
+  build-no-openmp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure without OpenMP
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_DISABLE_FIND_PACKAGE_OpenMP=TRUE
+      - name: Build
+        run: cmake --build build -j
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
